@@ -169,3 +169,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+import http from "http";
+const PORT = process.env.PORT || 10000;
+http.createServer((_, res) => res.end("Bot is running")).listen(PORT);
