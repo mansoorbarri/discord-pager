@@ -4,43 +4,48 @@ import fetch from 'node-fetch';
 export const data = new SlashCommandBuilder()
   .setName('metar')
   .setDescription('Get current METAR (weather data) for an airport.')
-  .addStringOption(option =>
-    option
-      .setName('icao')
-      .setDescription('The ICAO code of the airport (e.g. KJFK, EGLL)')
-      .setRequired(true)
+  .addStringOption(opt =>
+    opt.setName('icao').setDescription('ICAO code (e.g. KJFK, OPKC)').setRequired(true)
   );
 
 export async function execute(interaction) {
   const icao = interaction.options.getString('icao').toUpperCase();
   await interaction.deferReply();
 
+  const headers = process.env.AVWX_TOKEN
+    ? { Authorization: `Bearer ${process.env.AVWX_TOKEN}` }
+    : {};
+
   try {
-    const response = await fetch(`https://avwx.rest/api/metar/${icao}?format=json`, {
-      headers: { Authorization: `Bearer ${process.env.AVWX_TOKEN}` },
-    });
+    let response = await fetch(`https://avwx.rest/api/metar/${icao}?format=json`, { headers });
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const data = await response.json();
-    if (!data || !data.raw) {
-      return interaction.editReply(`❌ No METAR found for ${icao}.`);
+    // If AVWX returns 404 or unauth, fall back to aviationweather.gov text feed
+    if (response.status === 404 || response.status === 401) {
+      const alt = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=raw`);
+      if (!alt.ok) throw new Error(`Alt HTTP ${alt.status}`);
+      const txt = (await alt.text()).trim();
+      if (!txt) throw new Error('No data');
+      return await interaction.editReply(`**${icao} METAR**\n> ${txt}`);
     }
 
-    const reply = [
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (!data.raw) throw new Error('No METAR data');
+
+    const msg = [
       `**${data.station} METAR**`,
       `> ${data.raw}`,
       '',
       `**Flight Rules:** ${data.flight_rules}`,
-      `**Temperature:** ${data.temperature?.value ?? 'N/A'}°C`,
-      `**Wind:** ${data.wind_direction?.repr ?? 'Variable'} @ ${data.wind_speed?.repr ?? '0'} kt`,
+      `**Temp:** ${data.temperature?.value ?? 'N/A'}°C`,
+      `**Wind:** ${data.wind_direction?.repr ?? 'Var'} @ ${data.wind_speed?.repr ?? 0} kt`,
       `**Visibility:** ${data.visibility?.repr ?? 'N/A'} sm`,
       `**Time:** ${data.time?.dt ?? 'unknown'} UTC`,
     ].join('\n');
 
-    await interaction.editReply(reply);
+    await interaction.editReply(msg);
   } catch (err) {
     console.error(err);
-    await interaction.editReply(`❌ Error fetching METAR for ${icao}. Check the code or try again.`);
+    await interaction.editReply(`❌ Error fetching METAR for **${icao}**.`);
   }
 }

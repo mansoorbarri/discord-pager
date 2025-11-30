@@ -3,44 +3,37 @@ import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
   .setName('atis')
-  .setDescription('Get the current ATIS information for an airport.')
-  .addStringOption(option =>
-    option
-      .setName('icao')
-      .setDescription('The ICAO code of the airport (e.g. KLAX, EGLL)')
-      .setRequired(true)
+  .setDescription('Get current ATIS (if available) for an airport.')
+  .addStringOption(opt =>
+    opt.setName('icao').setDescription('ICAO code (e.g. KLAX, EGLL)').setRequired(true)
   );
 
 export async function execute(interaction) {
   const icao = interaction.options.getString('icao').toUpperCase();
   await interaction.deferReply();
 
+  const headers = process.env.AVWX_TOKEN
+    ? { Authorization: `Bearer ${process.env.AVWX_TOKEN}` }
+    : {};
+
   try {
-    const response = await fetch(`https://avwx.rest/api/atis/${icao}?format=json`, {
-      headers: { Authorization: `Bearer ${process.env.AVWX_TOKEN}` },
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const data = await response.json();
-    if (!data || (!data.speech && !data.raw)) {
-      return interaction.editReply(`❌ No ATIS found for ${icao}.`);
+    const res = await fetch(`https://avwx.rest/api/atis/${icao}?format=json`, { headers });
+    if (res.status === 404) {
+      return await interaction.editReply(`❌ ATIS unavailable for **${icao}**.`);
     }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
 
-    const reply = [
-      `**${data.station} ATIS**`,
+    const lines = [
+      `**${data.station ?? icao} ATIS**`,
       data.information ? `Information ${data.information}` : '',
-      '',
       data.raw ? `> ${data.raw}` : '',
-      '',
       data.speech ? `**Speech:**\n> ${data.speech}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ].filter(Boolean);
 
-    await interaction.editReply(reply);
+    await interaction.editReply(lines.join('\n'));
   } catch (err) {
     console.error(err);
-    await interaction.editReply(`❌ Error fetching ATIS for ${icao}. Check the code or try again.`);
+    await interaction.editReply(`❌ Could not get ATIS for **${icao}**.`);
   }
 }
