@@ -16,30 +16,23 @@ const commands = [
   // First command: /role
   new SlashCommandBuilder()
     .setName('role')
-    .setDescription('Assign or remove a role from a user.')
+    .setDescription('Add or remove multiple roles from a user.')
     .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('The user')
-        .setRequired(true)
+      option.setName('user').setDescription('Target user').setRequired(true)
     )
     .addStringOption(option =>
       option
         .setName('action')
-        .setDescription('add or remove')
+        .setDescription('Add or remove the roles')
         .setRequired(true)
-        .addChoices(
-          { name: 'add', value: 'add' },
-          { name: 'remove', value: 'remove' }
-        )
+        .addChoices({ name: 'add', value: 'add' }, { name: 'remove', value: 'remove' })
     )
-    .addRoleOption(option =>
+    .addStringOption(option =>
       option
-        .setName('role')
-        .setDescription('The role to assign or remove')
+        .setName('roles')
+        .setDescription('Mention each role separated by spaces')
         .setRequired(true)
     ),
-
   // Second command: /questioning
   new SlashCommandBuilder()
     .setName('questioning')
@@ -81,21 +74,42 @@ client.on('interactionCreate', async interaction => {
   if (interaction.commandName === 'role') {
     const target = interaction.options.getMember('user');
     const action = interaction.options.getString('action');
-    const role = interaction.options.getRole('role');
+    const rolesInput = interaction.options.getString('roles');
 
-    if (!target || !role)
-      return interaction.reply('Invalid user or role.');
+    if (!target) return interaction.reply('❌ Invalid user.');
+
+    // Parse role mentions or names
+    const roleIDs = [...rolesInput.matchAll(/<@&(\d+)>/g)].map(m => m[1]);
+    const roleNames = rolesInput.split(',').map(r => r.trim());
+
+    // Resolve roles
+    const roles = [];
+    for (const id of roleIDs) {
+      const role = interaction.guild.roles.cache.get(id);
+      if (role) roles.push(role);
+    }
+
+    // Also support names if user typed them
+    for (const name of roleNames) {
+      const role = interaction.guild.roles.cache.find(
+        r => r.name.toLowerCase() === name.toLowerCase()
+      );
+      if (role && !roles.some(r => r.id === role.id)) roles.push(role);
+    }
+
+    if (!roles.length)
+      return interaction.reply('❌ Could not find any valid roles.');
 
     try {
       if (action === 'add') {
-        await target.roles.add(role);
+        for (const role of roles) await target.roles.add(role);
         await interaction.reply(
-          `✅ Added role **${role.name}** to ${target.displayName}.`
+          `✅ Added roles ${roles.map(r => `**${r.name}**`).join(', ')} to ${target.displayName}.`
         );
       } else if (action === 'remove') {
-        await target.roles.remove(role);
+        for (const role of roles) await target.roles.remove(role);
         await interaction.reply(
-          `🗑️ Removed role **${role.name}** from ${target.displayName}.`
+          `🗑️ Removed roles ${roles.map(r => `**${r.name}**`).join(', ')} from ${target.displayName}.`
         );
       } else {
         await interaction.reply('❌ Unknown action.');
@@ -103,7 +117,7 @@ client.on('interactionCreate', async interaction => {
     } catch (err) {
       console.error(err);
       await interaction.reply(
-        '❌ I couldn’t modify that role. Please check my permissions.'
+        '❌ I couldn’t modify one or more roles. Check my permissions or hierarchy.'
       );
     }
     return;
