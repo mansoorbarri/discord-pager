@@ -13,5 +13,5 @@ To use the radar addon, please follow these steps:
 2. Make sure you have installed the radar addon script: <https://xyzmani.com/radar>
 3. After installing the script, open it in Tampermonkey and ensure you have entered your departure, arrival, and callsign, then clicked "Save".
     `;
-  await interaction.reply({ content: message, ephemeral: true });
+  await interaction.reply({ content: message });
 }
