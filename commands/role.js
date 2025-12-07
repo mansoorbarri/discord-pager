@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js'; // Import PermissionFlagsBits
 
 export const data = new SlashCommandBuilder()
   .setName('role')
@@ -21,6 +21,16 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  // Check if the user has Administrator permissions
+  if (
+    !interaction.member.permissions.has(PermissionFlagsBits.Administrator)
+  ) {
+    return interaction.reply({
+      content: '❌ You do not have permission to use this command.',
+      ephemeral: true,
+    });
+  }
+
   const target = interaction.options.getMember('user');
   const action = interaction.options.getString('action');
   const rolesInput = interaction.options.getString('roles');
