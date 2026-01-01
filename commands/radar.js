@@ -12,6 +12,7 @@ To use the radar addon, please follow these steps:
 1. Make sure you have Tampermonkey installed: <https://www.tampermonkey.net/>
 2. Make sure you have installed the radar addon script: <https://xyzmani.com/radar>
 3. After installing the script, go to GeoFS and ensure you have entered your departure, arrival, and callsign, then clicked "Save".
+4. now, you should be able to see yourself at: https://radarthing.com
     `;
   await interaction.reply({ content: message });
 }
