@@ -10,9 +10,14 @@ export async function execute(interaction) {
 To use the radar addon, please follow these steps:
 
 1. Make sure you have Tampermonkey installed: <https://www.tampermonkey.net/>
-2. Make sure you have installed the radar addon script: <https://xyzmani.com/radar>
-3. After installing the script, go to GeoFS and ensure you have entered your departure, arrival, and callsign, then clicked "Save".
-4. now, you should be able to see yourself at: https://radarthing.com
+2. Enable Developer Mode and allow user scripts:
+   - Go to your browser's extensions page (e.g., \`chrome://extensions\`)
+   - Toggle on **Developer mode** in the top right corner
+   - Click on Tampermonkey to expand its details
+   - Enable **"Allow user scripts"** (this is required for Tampermonkey to work)
+3. Make sure you have installed the radar addon script: <https://xyzmani.com/radar>
+4. After installing the script, go to GeoFS and ensure you have entered your departure, arrival, and callsign, then clicked "Save".
+5. Now, you should be able to see yourself at: https://radarthing.com
     `;
   await interaction.reply({ content: message });
 }
