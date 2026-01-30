@@ -1,4 +1,5 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { roleBackups } from '../roleBackup.js';
 
 export const data = new SlashCommandBuilder()
   .setName('questioning')
@@ -10,6 +11,13 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return interaction.reply({
+      content: '❌ You do not have permission to use this command.',
+      ephemeral: true,
+    });
+  }
+
   const target = interaction.options.getMember('user');
   if (!target) return interaction.reply('User not found.');
 
@@ -19,9 +27,14 @@ export async function execute(interaction) {
   );
 
   if (!questioningRole)
-    return interaction.reply('❌ "Questioning" role doesn’t exist in this server.');
+    return interaction.reply('❌ "Questioning" role doesn't exist in this server.');
 
-  const oldRoles = rolesToRemove.map(r => r.name);
+  const oldRoleIds = rolesToRemove.map(r => r.id);
+  const oldRoleNames = rolesToRemove.map(r => r.name);
+
+  // Save old roles for potential restoration via /unquestioning
+  const backupKey = `${interaction.guild.id}-${target.id}`;
+  roleBackups.set(backupKey, oldRoleIds);
 
   try {
     for (const role of rolesToRemove.values()) {
@@ -32,13 +45,13 @@ export async function execute(interaction) {
 
     await interaction.reply({
       content: `✅ Set ${target.displayName} to **Questioning**.\nRemoved: ${
-        oldRoles.length ? oldRoles.join(', ') : '(none)'
+        oldRoleNames.length ? oldRoleNames.join(', ') : '(none)'
       }`,
     });
   } catch (err) {
     console.error(err);
     await interaction.reply(
-      '❌ Couldn’t modify roles. Check permissions or hierarchy.'
+      '❌ Couldn't modify roles. Check permissions or hierarchy.'
     );
   }
 }
