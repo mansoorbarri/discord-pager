@@ -27,7 +27,7 @@ export async function execute(interaction) {
   );
 
   if (!questioningRole)
-    return interaction.reply('❌ "Questioning" role doesn't exist in this server.');
+    return interaction.reply(`❌ "Questioning" role doesn't exist in this server.`);
 
   const oldRoleIds = rolesToRemove.map(r => r.id);
   const oldRoleNames = rolesToRemove.map(r => r.name);
@@ -51,7 +51,7 @@ export async function execute(interaction) {
   } catch (err) {
     console.error(err);
     await interaction.reply(
-      '❌ Couldn't modify roles. Check permissions or hierarchy.'
+      `❌ Couldn't modify roles. Check permissions or hierarchy.`
     );
   }
 }
