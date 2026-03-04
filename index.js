@@ -5,7 +5,7 @@ import path from 'path';
 import http from 'http';
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
 client.commands = new Collection();
@@ -59,6 +59,26 @@ client.on('interactionCreate', async interaction => {
     } catch (followupError) {
       console.error('Follow‑up error:', followupError.message);
     }
+  }
+});
+
+// ---------- ROLE-MENTION GUARD ----------
+const PROTECTED_ROLE_ID = '1377626281897754687';
+const ALLOWED_ROLE_ID = '1377626143838048426';
+
+client.on('messageCreate', async message => {
+  if (message.author.bot) return;
+  if (!message.mentions.roles.has(PROTECTED_ROLE_ID)) return;
+  if (message.member?.roles.cache.has(ALLOWED_ROLE_ID)) return;
+
+  try {
+    await message.delete();
+    const warning = await message.channel.send(
+      `${message.author}, you don't have permission to ping <@&${PROTECTED_ROLE_ID}>.`
+    );
+    setTimeout(() => warning.delete().catch(() => {}), 5000);
+  } catch (err) {
+    console.error('Role-mention guard error:', err.message);
   }
 });
 
