@@ -6,7 +6,7 @@ const ADMIN_ROLE_ID = '1377624537386188883';
 
 export const data = new SlashCommandBuilder()
   .setName('airport_offline')
-  .setDescription('Mark an airport as no longer having ATC online.')
+  .setDescription('Remove yourself from ATC at an airport (admins can remove all).')
   .addStringOption(option =>
     option
       .setName('icao')
@@ -17,7 +17,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   if (!interaction.member.roles.cache.has(REQUIRED_ROLE_ID)) {
     return interaction.reply({
-      content: `❌ You need the <@&${REQUIRED_ROLE_ID}> role to use this command.`,
+      content: `You need the <@&${REQUIRED_ROLE_ID}> role to use this command.`,
       flags: 1 << 6,
     });
   }
@@ -26,7 +26,7 @@ export async function execute(interaction) {
 
   if (!ICAO_REGEX.test(icao)) {
     return interaction.reply({
-      content: `❌ Invalid ICAO code: \`${icao}\`. Must be exactly 4 letters.`,
+      content: `Invalid ICAO code: \`${icao}\`. Must be exactly 4 letters.`,
       flags: 1 << 6,
     });
   }
@@ -48,19 +48,19 @@ export async function execute(interaction) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return interaction.reply({
-        content: `❌ Failed to mark ${icao} offline: ${err.error || res.statusText}`,
+        content: `Failed to mark ${icao} offline: ${err.error || res.statusText}`,
         flags: 1 << 6,
       });
     }
 
     await interaction.reply({
-      content: `✅ **${icao}** ATC is now marked as offline.`,
+      content: `**${icao}** — You have been removed from ATC.${isAdmin ? ' (admin override)' : ''}`,
       flags: 1 << 6,
     });
   } catch (err) {
     console.error('[airport_offline]', err);
     await interaction.reply({
-      content: `❌ Could not reach radar server.`,
+      content: `Could not reach radar server.`,
       flags: 1 << 6,
     });
   }

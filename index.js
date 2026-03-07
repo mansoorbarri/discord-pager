@@ -38,8 +38,26 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// ---------- INTERACTION HANDLER (put THIS part) ----------
+// ---------- INTERACTION HANDLER ----------
 client.on('interactionCreate', async interaction => {
+  // Handle select menu interactions (e.g., ATC position selection)
+  if (interaction.isStringSelectMenu()) {
+    if (interaction.customId.startsWith('atc_position:')) {
+      try {
+        const airportOnline = client.commands.get('airport_online');
+        if (airportOnline?.handlePositionSelect) {
+          await airportOnline.handlePositionSelect(interaction);
+        }
+      } catch (error) {
+        console.error('Select menu error:', error);
+        try {
+          await interaction.update({ content: 'Something went wrong.', components: [] });
+        } catch {}
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
@@ -48,16 +66,15 @@ client.on('interactionCreate', async interaction => {
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
-    const msg = '❌ Something went wrong running that command.';
+    const msg = 'Something went wrong running that command.';
     try {
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply(msg);
       } else {
-        // `flags: 1 << 6` = ephemeral = only user can see
         await interaction.reply({ content: msg, flags: 1 << 6 });
       }
     } catch (followupError) {
-      console.error('Follow‑up error:', followupError.message);
+      console.error('Follow-up error:', followupError.message);
     }
   }
 });
