@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { roleBackups } from '../roleBackup.js';
+import { setRoleBackup } from '../roleBackup.js';
 
 export const data = new SlashCommandBuilder()
   .setName('questioning')
@@ -34,7 +34,7 @@ export async function execute(interaction) {
 
   // Save old roles for potential restoration via /unquestioning
   const backupKey = `${interaction.guild.id}-${target.id}`;
-  roleBackups.set(backupKey, oldRoleIds);
+  await setRoleBackup(backupKey, oldRoleIds);
 
   try {
     for (const role of rolesToRemove.values()) {

@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { roleBackups } from '../roleBackup.js';
+import { deleteRoleBackup, roleBackups } from '../roleBackup.js';
 
 export const data = new SlashCommandBuilder()
   .setName('unquestioning')
@@ -37,7 +37,7 @@ export async function execute(interaction) {
 
   if (!savedRoleIds || savedRoleIds.length === 0) {
     return interaction.reply(
-      `❌ No saved roles found for ${target.displayName}. Their previous roles may have been lost (bot restarted or they were never set via /questioning).`
+      `❌ No saved roles found for ${target.displayName}. They may not have been set via /questioning, or the backup record is missing.`
     );
   }
 
@@ -56,7 +56,7 @@ export async function execute(interaction) {
     }
 
     // Clear the backup
-    roleBackups.delete(backupKey);
+    await deleteRoleBackup(backupKey);
 
     await interaction.reply({
       content: `✅ Removed **Questioning** from ${target.displayName}.\nRestored: ${
