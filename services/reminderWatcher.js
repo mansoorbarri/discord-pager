@@ -290,15 +290,24 @@ export async function startReminderWatcher(client) {
   if (discordClient) return;
 
   discordClient = client;
-  await refreshRemindersFromApi();
+  try {
+    await refreshRemindersFromApi();
+  } catch (error) {
+    console.error('[reminder] initial reminder sync failed:', error);
+  }
+
   connectToStream();
 
   refreshTimer = setInterval(() => {
-    void refreshRemindersFromApi();
+    void refreshRemindersFromApi().catch((error) => {
+      console.error('[reminder] periodic reminder sync failed:', error);
+    });
   }, refreshIntervalMs);
 
   reconcileTimer = setInterval(() => {
-    void reconcileAllReminders();
+    void reconcileAllReminders().catch((error) => {
+      console.error('[reminder] reconcile loop failed:', error);
+    });
   }, reconcileIntervalMs);
 }
 
