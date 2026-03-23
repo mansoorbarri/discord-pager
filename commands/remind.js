@@ -26,7 +26,8 @@ function findAircraftForUser(googleId, callsign) {
   return getAircraftSnapshot().find(
     aircraft =>
       aircraft.googleId === googleId &&
-      normalize(aircraft.callsign) === normalize(callsign)
+      (normalize(aircraft.flightNo) === normalize(callsign) ||
+        normalize(aircraft.callsign) === normalize(callsign))
   );
 }
 
@@ -43,7 +44,7 @@ export const data = new SlashCommandBuilder()
   .addStringOption(option =>
     option
       .setName('callsign')
-      .setDescription('Your live flight callsign')
+      .setDescription('Your live flight number (for example AFR650)')
       .setRequired(true)
   )
   .addStringOption(option =>
@@ -97,6 +98,7 @@ export async function execute(interaction) {
   if (!aircraft) {
     await interaction.editReply(
       `No live flight was found for **${callsign}** on your connected RadarThing account. Make sure the callsign is yours and the flight is currently visible on the radar.`
+      
     );
     return;
   }

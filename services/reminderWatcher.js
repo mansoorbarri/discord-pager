@@ -46,7 +46,8 @@ function aircraftMatchesReminder(aircraft, reminder) {
   return (
     aircraft &&
     aircraft.googleId === reminder.googleId &&
-    normalize(aircraft.callsign) === normalize(reminder.callsign)
+    (normalize(aircraft.flightNo) === normalize(reminder.callsign) ||
+      normalize(aircraft.callsign) === normalize(reminder.callsign))
   );
 }
 
