@@ -3,6 +3,7 @@ import { Client, GatewayIntentBits, REST, Routes, Collection } from 'discord.js'
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
+import { startReminderWatcher } from './services/reminderWatcher.js';
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -36,6 +37,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 // ---------- READY ----------
 client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
+  void startReminderWatcher(client);
 });
 
 // ---------- INTERACTION HANDLER ----------
