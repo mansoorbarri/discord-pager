@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { ADMIN_ROLE_ID, ATC_ROLE_ID } from '../config/commandPolicy.js';
+import { ADMIN_ROLE_ID, ATC_ROLE_ID, SCHEDULE_CHANNEL_ID } from '../config/commandPolicy.js';
 
 const adminHelpSections = [
   [
@@ -24,6 +24,16 @@ const adminHelpSections = [
     `Use: ATC only (<@&${ATC_ROLE_ID}>), with admin override support for <@&${ADMIN_ROLE_ID}>`,
     'Channel: any channel unless restricted later',
     'Purpose: admins can remove all controllers from an airport when needed.',
+    '',
+    '`/atc_schedule admin_assign request_id:<ID> controller:<USER>`',
+    `Use: admins only (<@&${ADMIN_ROLE_ID}>)`,
+    `Channel: <#${SCHEDULE_CHANNEL_ID}> only`,
+    'Purpose: assign any ATC member to a scheduled request.',
+    '',
+    '`/atc_schedule admin_unassign request_id:<ID> controller:<USER>`',
+    `Use: admins only (<@&${ADMIN_ROLE_ID}>)`,
+    `Channel: <#${SCHEDULE_CHANNEL_ID}> only`,
+    'Purpose: remove any assigned controller from a scheduled request.',
     '',
     '`/admin_help`',
     `Use: admins only (<@&${ADMIN_ROLE_ID}>)`,

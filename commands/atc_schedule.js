@@ -10,6 +10,7 @@ import {
   unassignController,
 } from '../services/atcScheduleStore.js';
 import {
+  ADMIN_ROLE_ID,
   ATC_ROLE_ID,
   PILOT_ROLE_ID,
   isInScheduleChannel,
@@ -27,6 +28,10 @@ function hasPilotRole(interaction) {
 
 function hasAtcRole(interaction) {
   return interaction.member.roles.cache.has(ATC_ROLE_ID);
+}
+
+function hasAdminRole(interaction) {
+  return interaction.member.roles.cache.has(ADMIN_ROLE_ID);
 }
 
 function normalizeIcao(value) {
@@ -341,6 +346,95 @@ async function handleCancel(interaction) {
   });
 }
 
+async function handleAdminAssign(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
+  if (!hasAdminRole(interaction)) {
+    return interaction.reply({
+      content: `You need the <@&${ADMIN_ROLE_ID}> role to use this command.`,
+      flags: 1 << 6,
+    });
+  }
+
+  const requestId = interaction.options.getString('request_id');
+  const targetUser = interaction.options.getUser('controller');
+  const targetMember = interaction.options.getMember('controller');
+
+  if (!targetMember || !targetMember.roles.cache.has(ATC_ROLE_ID)) {
+    return interaction.reply({
+      content: `That user must have the <@&${ATC_ROLE_ID}> role before they can be assigned as a controller.`,
+      flags: 1 << 6,
+    });
+  }
+
+  const result = await assignController(requestId, {
+    userId: targetUser.id,
+    username: targetMember.displayName || targetUser.username,
+  });
+
+  if (result.error === 'not_found') {
+    return interaction.reply({
+      content: `No active ATC request was found for ID \`${String(requestId).toUpperCase()}\`.`,
+      flags: 1 << 6,
+    });
+  }
+
+  if (result.error === 'already_assigned') {
+    return interaction.reply({
+      content: `<@${targetUser.id}> is already assigned to **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
+      flags: 1 << 6,
+    });
+  }
+
+  if (result.error === 'full') {
+    return interaction.reply({
+      content: `That request already has ${getControllerLimit()} controllers assigned.`,
+      flags: 1 << 6,
+    });
+  }
+
+  await interaction.reply({
+    content: `Admin override: <@${targetUser.id}> was assigned to **${result.schedule.callsign}** at **${result.schedule.airport}**.\nControllers:\n${describeControllers(result.schedule)}`,
+  });
+}
+
+async function handleAdminUnassign(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
+  if (!hasAdminRole(interaction)) {
+    return interaction.reply({
+      content: `You need the <@&${ADMIN_ROLE_ID}> role to use this command.`,
+      flags: 1 << 6,
+    });
+  }
+
+  const requestId = interaction.options.getString('request_id');
+  const targetUser = interaction.options.getUser('controller');
+  const result = await unassignController(requestId, targetUser.id);
+
+  if (result.error === 'not_found') {
+    return interaction.reply({
+      content: `No active ATC request was found for ID \`${String(requestId).toUpperCase()}\`.`,
+      flags: 1 << 6,
+    });
+  }
+
+  if (result.error === 'not_assigned') {
+    return interaction.reply({
+      content: `<@${targetUser.id}> is not assigned to that request.`,
+      flags: 1 << 6,
+    });
+  }
+
+  await interaction.reply({
+    content: `Admin override: <@${targetUser.id}> was removed from **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
+  });
+}
+
 export const data = new SlashCommandBuilder()
   .setName('atc_schedule')
   .setDescription('Create and manage scheduled ATC requests.')
@@ -422,6 +516,40 @@ export const data = new SlashCommandBuilder()
           .setDescription('The request ID shown in /atc_schedule list')
           .setRequired(true)
       )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('admin_assign')
+      .setDescription('Admin override: assign a controller to a request.')
+      .addStringOption(option =>
+        option
+          .setName('request_id')
+          .setDescription('The request ID shown in /atc_schedule list')
+          .setRequired(true)
+      )
+      .addUserOption(option =>
+        option
+          .setName('controller')
+          .setDescription('The ATC member to assign')
+          .setRequired(true)
+      )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('admin_unassign')
+      .setDescription('Admin override: remove a controller from a request.')
+      .addStringOption(option =>
+        option
+          .setName('request_id')
+          .setDescription('The request ID shown in /atc_schedule list')
+          .setRequired(true)
+      )
+      .addUserOption(option =>
+        option
+          .setName('controller')
+          .setDescription('The assigned controller to remove')
+          .setRequired(true)
+      )
   );
 
 export async function execute(interaction) {
@@ -445,6 +573,14 @@ export async function execute(interaction) {
 
   if (subcommand === 'cancel') {
     return handleCancel(interaction);
+  }
+
+  if (subcommand === 'admin_assign') {
+    return handleAdminAssign(interaction);
+  }
+
+  if (subcommand === 'admin_unassign') {
+    return handleAdminUnassign(interaction);
   }
 
   return interaction.reply({
