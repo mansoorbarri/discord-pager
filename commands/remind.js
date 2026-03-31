@@ -6,6 +6,10 @@ const minIntervalSeconds = 3;
 const maxIntervalSeconds = 300;
 const minDurationSeconds = 30;
 const maxDurationSeconds = 3600;
+const deliveryTargets = {
+  dm: 'dm',
+  server: 'server',
+};
 
 function normalize(value) {
   return String(value || '').trim().toUpperCase();
@@ -68,6 +72,16 @@ export const data = new SlashCommandBuilder()
       .setRequired(true)
       .setMinValue(minDurationSeconds)
       .setMaxValue(maxDurationSeconds)
+  )
+  .addStringOption(option =>
+    option
+      .setName('delivery')
+      .setDescription('Where the reminder should be sent')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Direct message', value: deliveryTargets.dm },
+        { name: 'This server channel', value: deliveryTargets.server }
+      )
   );
 
 export async function execute(interaction) {
@@ -77,6 +91,14 @@ export async function execute(interaction) {
   const waypointIdent = normalize(interaction.options.getString('waypoint'));
   const intervalSeconds = interaction.options.getInteger('interval');
   const durationSeconds = interaction.options.getInteger('duration');
+  const deliveryTarget = interaction.options.getString('delivery');
+
+  if (deliveryTarget === deliveryTargets.server && !interaction.inGuild()) {
+    await interaction.editReply(
+      'Server reminders can only be armed from a server channel. Use the command in the channel you want to be pinged in, or choose direct message delivery.'
+    );
+    return;
+  }
 
   const lookup = await lookupUserByDiscordUsername(interaction.user.username);
 
@@ -115,6 +137,9 @@ export async function execute(interaction) {
     googleId: lookup.user.googleId,
     discordUsername: lookup.user.discordUsername || interaction.user.username,
     discordUserId: interaction.user.id,
+    deliveryTarget,
+    channelId: deliveryTarget === deliveryTargets.server ? interaction.channelId : null,
+    guildId: deliveryTarget === deliveryTargets.server ? interaction.guildId : null,
     callsign,
     waypointIdent,
     intervalSeconds,
@@ -127,6 +152,9 @@ export async function execute(interaction) {
     googleId: lookup.user.googleId,
     discordUsername: lookup.user.discordUsername || interaction.user.username,
     discordUserId: interaction.user.id,
+    deliveryTarget,
+    channelId: deliveryTarget === deliveryTargets.server ? interaction.channelId : null,
+    guildId: deliveryTarget === deliveryTargets.server ? interaction.guildId : null,
     callsign,
     waypointIdent,
     intervalSeconds,
@@ -136,6 +164,8 @@ export async function execute(interaction) {
   });
 
   await interaction.editReply(
-    `Reminder armed for **${callsign}** at **${waypointIdent}**. I will DM you every **${intervalSeconds}s** for **${durationSeconds}s** after that waypoint is reached.`
+    deliveryTarget === deliveryTargets.server
+      ? `Reminder armed for **${callsign}** at **${waypointIdent}**. I will ping you in this channel every **${intervalSeconds}s** for **${durationSeconds}s** after that waypoint is reached.`
+      : `Reminder armed for **${callsign}** at **${waypointIdent}**. I will DM you every **${intervalSeconds}s** for **${durationSeconds}s** after that waypoint is reached.`
   );
 }

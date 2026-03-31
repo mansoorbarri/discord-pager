@@ -69,8 +69,26 @@ function reminderHasWaypoint(reminder, aircraft) {
 }
 
 async function sendReminderPing(reminder) {
-  const user = await discordClient.users.fetch(reminder.discordUserId);
   const message = `Waypoint reminder for **${reminder.callsign}**: you asked to be pinged after **${reminder.waypointIdent}**.`;
+
+  if (reminder.deliveryTarget === 'server') {
+    if (!reminder.channelId) {
+      throw new Error('Missing reminder channel for server delivery');
+    }
+
+    const channel = await discordClient.channels.fetch(reminder.channelId);
+    if (!channel?.isTextBased?.() || typeof channel.send !== 'function') {
+      throw new Error('Reminder channel is not sendable');
+    }
+
+    await channel.send({
+      content: `<@${reminder.discordUserId}> ${message}`,
+      allowedMentions: { users: [reminder.discordUserId] },
+    });
+    return;
+  }
+
+  const user = await discordClient.users.fetch(reminder.discordUserId);
   await user.send(message);
 }
 
@@ -98,7 +116,7 @@ async function startReminderLoop(reminder, sendImmediately = true) {
     } catch (error) {
       console.error('[reminder] initial ping failed:', error);
       await stopReminder(reminder._id, async current =>
-        markReminderFailed(current._id, Date.now(), 'Initial Discord DM failed')
+        markReminderFailed(current._id, Date.now(), 'Initial Discord delivery failed')
       );
       return;
     }
@@ -124,7 +142,7 @@ async function startReminderLoop(reminder, sendImmediately = true) {
     } catch (error) {
       console.error('[reminder] recurring ping failed:', error);
       await stopReminder(currentReminder._id, async current =>
-        markReminderFailed(current._id, Date.now(), 'Recurring Discord DM failed')
+        markReminderFailed(current._id, Date.now(), 'Recurring Discord delivery failed')
       );
     }
   }, reminder.intervalSeconds * 1000);
