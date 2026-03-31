@@ -1,6 +1,7 @@
 import { EventSource } from 'eventsource';
 import {
   listActiveReminders,
+  markReminderCancelled,
   markReminderCompleted,
   markReminderFailed,
   markReminderSent,
@@ -13,6 +14,8 @@ const reconcileIntervalMs = 1000;
 const activeReminders = new Map();
 const reminderTimers = new Map();
 const aircraftByKey = new Map();
+const reminderMessages = new Map();
+const reminderMessageIdsByReminder = new Map();
 
 let discordClient = null;
 let eventSource = null;
@@ -83,6 +86,25 @@ function reminderHasWaypoint(reminder, aircraft) {
   );
 }
 
+function trackReminderMessage(reminderId, discordUserId, messageId) {
+  reminderMessages.set(messageId, { reminderId, discordUserId });
+
+  const ids = reminderMessageIdsByReminder.get(reminderId) || new Set();
+  ids.add(messageId);
+  reminderMessageIdsByReminder.set(reminderId, ids);
+}
+
+function clearReminderMessages(reminderId) {
+  const ids = reminderMessageIdsByReminder.get(reminderId);
+  if (!ids) return;
+
+  for (const messageId of ids) {
+    reminderMessages.delete(messageId);
+  }
+
+  reminderMessageIdsByReminder.delete(reminderId);
+}
+
 async function sendReminderPing(reminder) {
   const message = `Waypoint reminder for **${reminder.callsign}**: you asked to be pinged after **${reminder.waypointIdent}**.`;
 
@@ -96,15 +118,17 @@ async function sendReminderPing(reminder) {
       throw new Error('Reminder channel is not sendable');
     }
 
-    await channel.send({
+    const sentMessage = await channel.send({
       content: `<@${reminder.discordUserId}> ${message}`,
       allowedMentions: { users: [reminder.discordUserId] },
     });
+    trackReminderMessage(reminder._id, reminder.discordUserId, sentMessage.id);
     return;
   }
 
   const user = await discordClient.users.fetch(reminder.discordUserId);
-  await user.send(message);
+  const sentMessage = await user.send(message);
+  trackReminderMessage(reminder._id, reminder.discordUserId, sentMessage.id);
 }
 
 async function stopReminder(reminderId, finalizer) {
@@ -118,6 +142,7 @@ async function stopReminder(reminderId, finalizer) {
   if (!state) return;
 
   activeReminders.delete(reminderId);
+  clearReminderMessages(reminderId);
   await finalizer(state.reminder);
 }
 
@@ -328,6 +353,19 @@ export function unregisterReminder(reminderId) {
   }
 
   activeReminders.delete(reminderId);
+  clearReminderMessages(reminderId);
+}
+
+export async function cancelReminderFromReaction(messageId, reactingUserId) {
+  const trackedMessage = reminderMessages.get(messageId);
+  if (!trackedMessage || trackedMessage.discordUserId !== reactingUserId) {
+    return false;
+  }
+
+  await stopReminder(trackedMessage.reminderId, async current =>
+    markReminderCancelled(current._id, Date.now())
+  );
+  return true;
 }
 
 export async function startReminderWatcher(client) {
@@ -378,6 +416,8 @@ export function stopReminderWatcher() {
   reminderTimers.clear();
   activeReminders.clear();
   aircraftByKey.clear();
+  reminderMessages.clear();
+  reminderMessageIdsByReminder.clear();
   discordClient = null;
 }
 

@@ -1,14 +1,23 @@
 import 'dotenv/config';
-import { Client, GatewayIntentBits, REST, Routes, Collection } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, Collection, Partials } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
-import { startReminderWatcher } from './services/reminderWatcher.js';
+import { cancelReminderFromReaction, startReminderWatcher } from './services/reminderWatcher.js';
 import { loadRoleBackups } from './roleBackup.js';
 import { loadAtcSchedules } from './services/atcScheduleStore.js';
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.DirectMessageReactions,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
 
 client.commands = new Collection();
@@ -103,6 +112,24 @@ client.on('messageCreate', async message => {
     setTimeout(() => warning.delete().catch(() => {}), 5000);
   } catch (err) {
     console.error('Role-mention guard error:', err.message);
+  }
+});
+
+client.on('messageReactionAdd', async (reaction, user) => {
+  if (user.bot) return;
+
+  try {
+    if (reaction.partial) {
+      await reaction.fetch();
+    }
+
+    if (reaction.message.partial) {
+      await reaction.message.fetch();
+    }
+
+    await cancelReminderFromReaction(reaction.message.id, user.id);
+  } catch (error) {
+    console.error('[reminder] reaction cancel failed:', error);
   }
 });
 
