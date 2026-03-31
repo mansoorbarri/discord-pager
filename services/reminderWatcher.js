@@ -42,6 +42,21 @@ function reminderState(reminder) {
   };
 }
 
+function mergeReminder(existingReminder, incomingReminder) {
+  if (!existingReminder) return incomingReminder;
+  if (!incomingReminder) return existingReminder;
+
+  return {
+    ...existingReminder,
+    ...incomingReminder,
+    discordUserId: incomingReminder.discordUserId ?? existingReminder.discordUserId,
+    discordUsername: incomingReminder.discordUsername ?? existingReminder.discordUsername,
+    deliveryTarget: incomingReminder.deliveryTarget ?? existingReminder.deliveryTarget,
+    channelId: incomingReminder.channelId ?? existingReminder.channelId,
+    guildId: incomingReminder.guildId ?? existingReminder.guildId,
+  };
+}
+
 function aircraftMatchesReminder(aircraft, reminder) {
   return (
     aircraft &&
@@ -158,10 +173,10 @@ async function handleTriggeredReminder(reminderId) {
   const response = await markReminderTriggered(reminderId, triggeredAt);
   if (!response?.reminder) return;
 
-  state.reminder = response.reminder;
+  state.reminder = mergeReminder(state.reminder, response.reminder);
   activeReminders.set(reminderId, state);
 
-  await startReminderLoop(response.reminder, true);
+  await startReminderLoop(state.reminder, true);
 }
 
 async function reconcileReminder(reminderId) {
@@ -241,7 +256,7 @@ async function refreshRemindersFromApi() {
     nextIds.add(reminder._id);
     const existing = activeReminders.get(reminder._id);
     if (existing) {
-      existing.reminder = reminder;
+      existing.reminder = mergeReminder(existing.reminder, reminder);
     } else {
       activeReminders.set(reminder._id, reminderState(reminder));
       if (reminder.status === 'active' && !reminderTimers.has(reminder._id)) {
@@ -298,7 +313,7 @@ function connectToStream() {
 export async function registerReminder(reminder) {
   const existing = activeReminders.get(reminder._id);
   if (existing) {
-    existing.reminder = reminder;
+    existing.reminder = mergeReminder(existing.reminder, reminder);
     return;
   }
 
