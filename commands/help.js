@@ -1,10 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import {
-  ADMIN_ROLE_ID,
-  ATC_ROLE_ID,
-  PILOT_ROLE_ID,
-  SCHEDULE_CHANNEL_ID,
-} from '../config/commandPolicy.js';
+import { ATC_ROLE_ID, PILOT_ROLE_ID, SCHEDULE_CHANNEL_ID } from '../config/commandPolicy.js';
 
 const helpSections = [
   [
@@ -39,7 +34,7 @@ const helpSections = [
     'ATC schedules are stored in `data/atcSchedules.json` and reloaded when the bot starts.',
   ],
   [
-    '**Pager Bot Commands: Other**',
+    '**Pager Bot Commands: General**',
     '',
     '`/airport_online icao:<ICAO>`',
     `Use: ATC only (<@&${ATC_ROLE_ID}>)`,
@@ -47,7 +42,7 @@ const helpSections = [
     'Purpose: mark an airport as being staffed live right now.',
     '',
     '`/airport_offline icao:<ICAO>`',
-    `Use: ATC only (<@&${ATC_ROLE_ID}>), admins can override with role <@&${ADMIN_ROLE_ID}>`,
+    `Use: ATC only (<@&${ATC_ROLE_ID}>)`,
     'Channel: any channel unless you want this restricted later',
     'Purpose: remove yourself from live airport staffing.',
     '',
@@ -61,20 +56,10 @@ const helpSections = [
     'Channel: any channel',
     'Purpose: shows radar addon setup instructions.',
     '',
-    '`/role user:<USER> action:<add|remove> roles:<ROLES>`',
-    'Use: administrators only',
+    '`/help`',
+    'Use: anyone',
     'Channel: any channel',
-    'Purpose: add or remove roles from a member.',
-    '',
-    '`/questioning user:<USER>`',
-    'Use: administrators only',
-    'Channel: any channel',
-    'Purpose: strip roles and set a user to Questioning.',
-    '',
-    '`/unquestioning user:<USER>`',
-    'Use: administrators only',
-    'Channel: any channel',
-    'Purpose: restore the roles previously removed by `/questioning`.',
+    'Purpose: shows user-facing command help.',
   ],
 ];
 
