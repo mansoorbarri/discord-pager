@@ -9,9 +9,13 @@ import {
   listGuildSchedules,
   unassignController,
 } from '../services/atcScheduleStore.js';
+import {
+  ATC_ROLE_ID,
+  PILOT_ROLE_ID,
+  isInScheduleChannel,
+  scheduleChannelMention,
+} from '../config/commandPolicy.js';
 
-const PILOT_ROLE_ID = '1377626281897754687';
-const ATC_ROLE_ID = '1377626143838048426';
 const ICAO_REGEX = /^[A-Z]{4}$/;
 const CALLSIGN_REGEX = /^[A-Z0-9-]{2,12}$/;
 const MAX_NOTES_LENGTH = 300;
@@ -102,7 +106,18 @@ function formatScheduleLine(schedule) {
   return `**${schedule.id}** | ${schedule.callsign} | ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: <@${schedule.pilotId}> | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${notesSuffix}`;
 }
 
+function scheduleChannelError() {
+  return {
+    content: `This command can only be used in ${scheduleChannelMention()}.`,
+    flags: 1 << 6,
+  };
+}
+
 async function handleCreate(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
   if (!hasPilotRole(interaction)) {
     return interaction.reply({
       content: `You need the <@&${PILOT_ROLE_ID}> role to create an ATC request.`,
@@ -173,11 +188,14 @@ async function handleCreate(interaction) {
 
   await interaction.reply({
     content: `ATC request created.\nID: **${schedule.id}**\nFlight: **${schedule.callsign}** into **${schedule.airport}**\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers: 0/${getControllerLimit()}\nATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
-    flags: 1 << 6,
   });
 }
 
 async function handleList(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
   if (!hasPilotRole(interaction) && !hasAtcRole(interaction)) {
     return interaction.reply({
       content: `You need either the <@&${PILOT_ROLE_ID}> or <@&${ATC_ROLE_ID}> role to view ATC schedules.`,
@@ -211,11 +229,14 @@ async function handleList(interaction) {
     ]
       .filter(Boolean)
       .join('\n'),
-    flags: 1 << 6,
   });
 }
 
 async function handleAssign(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
   if (!hasAtcRole(interaction)) {
     return interaction.reply({
       content: `You need the <@&${ATC_ROLE_ID}> role to assign yourself to a flight.`,
@@ -253,11 +274,14 @@ async function handleAssign(interaction) {
   const { schedule } = result;
   await interaction.reply({
     content: `You are now assigned to **${schedule.callsign}** at **${schedule.airport}**.\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers:\n${describeControllers(schedule)}`,
-    flags: 1 << 6,
   });
 }
 
 async function handleUnassign(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
   if (!hasAtcRole(interaction)) {
     return interaction.reply({
       content: `You need the <@&${ATC_ROLE_ID}> role to remove yourself from a flight.`,
@@ -284,11 +308,14 @@ async function handleUnassign(interaction) {
 
   await interaction.reply({
     content: `You were removed from **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
-    flags: 1 << 6,
   });
 }
 
 async function handleCancel(interaction) {
+  if (!isInScheduleChannel(interaction)) {
+    return interaction.reply(scheduleChannelError());
+  }
+
   const requestId = interaction.options.getString('request_id');
   const schedule = getAtcSchedule(requestId);
 
@@ -311,7 +338,6 @@ async function handleCancel(interaction) {
 
   await interaction.reply({
     content: `Cancelled request **${schedule.id}** for **${schedule.callsign}** at **${schedule.airport}**.`,
-    flags: 1 << 6,
   });
 }
 
