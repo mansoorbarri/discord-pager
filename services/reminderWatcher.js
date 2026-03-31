@@ -305,6 +305,16 @@ export async function registerReminder(reminder) {
   activeReminders.set(reminder._id, reminderState(reminder));
 }
 
+export function unregisterReminder(reminderId) {
+  const timer = reminderTimers.get(reminderId);
+  if (timer) {
+    clearInterval(timer);
+    reminderTimers.delete(reminderId);
+  }
+
+  activeReminders.delete(reminderId);
+}
+
 export async function startReminderWatcher(client) {
   if (discordClient) return;
 
