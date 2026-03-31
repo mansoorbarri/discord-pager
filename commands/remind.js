@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { reminderChannelMention } from '../config/commandPolicy.js';
 import { createReminder } from '../services/reminderApi.js';
 import { registerReminder } from '../services/reminderWatcher.js';
 import {
@@ -101,7 +102,7 @@ export async function execute(interaction) {
 
   await interaction.editReply(
     deliveryTarget === deliveryTargets.server
-      ? `Reminder armed for **${callsign}** at **${waypointIdent}**. I will ping you in this channel every **${intervalSeconds}s** for **${durationSeconds}s** after that waypoint is reached.`
+      ? `Reminder armed for **${callsign}** at **${waypointIdent}**. I will ping you in ${reminderChannelMention()} every **${intervalSeconds}s** for **${durationSeconds}s** after that waypoint is reached.`
       : `Reminder armed for **${callsign}** at **${waypointIdent}**. I will DM you every **${intervalSeconds}s** for **${durationSeconds}s** after that waypoint is reached.`
   );
 }

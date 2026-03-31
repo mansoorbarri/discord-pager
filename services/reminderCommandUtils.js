@@ -1,4 +1,5 @@
 import { listActiveReminders, lookupUserByDiscordUsername } from './reminderApi.js';
+import { REMINDER_CHANNEL_ID } from '../config/commandPolicy.js';
 import { getAircraftSnapshot } from './reminderWatcher.js';
 
 export const deliveryTargets = {
@@ -78,13 +79,6 @@ export async function validateReminderRequest({
   waypointIdent,
   deliveryTarget,
 }) {
-  if (deliveryTarget === deliveryTargets.server && !interaction.inGuild()) {
-    await interaction.editReply(
-      'Server reminders can only be armed from a server channel. Use the command in the channel you want to be pinged in, or choose direct message delivery.'
-    );
-    return null;
-  }
-
   const aircraft = findAircraftForUser(user.googleId, callsign);
   if (!aircraft) {
     await interaction.editReply(
@@ -118,7 +112,7 @@ export function buildReminderPayload({
     discordUsername: user.discordUsername,
     discordUserId: user.discordUserId,
     deliveryTarget,
-    channelId: deliveryTarget === deliveryTargets.server ? interaction.channelId : null,
+    channelId: deliveryTarget === deliveryTargets.server ? REMINDER_CHANNEL_ID : null,
     guildId: deliveryTarget === deliveryTargets.server ? interaction.guildId : null,
     callsign,
     waypointIdent,
