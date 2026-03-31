@@ -5,6 +5,7 @@ import path from 'path';
 import http from 'http';
 import { startReminderWatcher } from './services/reminderWatcher.js';
 import { loadRoleBackups } from './roleBackup.js';
+import { loadAtcSchedules } from './services/atcScheduleStore.js';
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -13,6 +14,7 @@ const client = new Client({
 client.commands = new Collection();
 
 await loadRoleBackups();
+await loadAtcSchedules();
 
 // ---------- LOAD COMMAND FILES ----------
 const commands = [];
