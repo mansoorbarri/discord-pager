@@ -17,6 +17,11 @@ function normalizeCallsign(value) {
   return String(value || '').trim().toUpperCase();
 }
 
+function normalizeDirection(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'arrival' || normalized === 'departure' ? normalized : 'unspecified';
+}
+
 function createId() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
@@ -47,6 +52,7 @@ function sanitizeSchedule(schedule) {
   const pilotId = String(schedule.pilotId || '').trim();
   const pilotName = String(schedule.pilotName || '').trim();
   const airport = normalizeIcao(schedule.airport);
+  const direction = normalizeDirection(schedule.direction);
   const callsign = normalizeCallsign(schedule.callsign);
   const notes = String(schedule.notes || '').trim();
   const requestedTime = Number(schedule.requestedTime);
@@ -75,6 +81,7 @@ function sanitizeSchedule(schedule) {
     pilotId,
     pilotName,
     airport,
+    direction,
     callsign,
     notes,
     requestedTime,
@@ -144,6 +151,7 @@ export async function createAtcSchedule({
   pilotId,
   pilotName,
   airport,
+  direction,
   callsign,
   requestedTime,
   notes = '',
@@ -155,6 +163,7 @@ export async function createAtcSchedule({
     pilotId: String(pilotId),
     pilotName: String(pilotName).trim(),
     airport: normalizeIcao(airport),
+    direction: normalizeDirection(direction),
     callsign: normalizeCallsign(callsign),
     requestedTime,
     notes: String(notes || '').trim(),

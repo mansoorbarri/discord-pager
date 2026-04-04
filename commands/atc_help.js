@@ -9,7 +9,7 @@ const atcHelpSections = [
   [
     '**Pager Bot Commands: ATC**',
     '',
-    '`/atc_schedule create airport:<ICAO> callsign:<CALLSIGN> time:<YYYY-MM-DD HH:MM UTC> [notes]`',
+    '`/atc_schedule create airport:<ICAO> direction:<arrival|departure> callsign:<CALLSIGN> time:<YYYY-MM-DD HH:MM UTC> [notes]`',
     `Use: pilots only (<@&${PILOT_ROLE_ID}>)`,
     `Channel: <#${SCHEDULE_CHANNEL_ID}> only`,
     'Purpose: create a scheduled ATC request so controllers can claim it ahead of time.',

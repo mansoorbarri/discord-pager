@@ -21,6 +21,10 @@ const ICAO_REGEX = /^[A-Z]{4}$/;
 const CALLSIGN_REGEX = /^[A-Z0-9-]{2,12}$/;
 const MAX_NOTES_LENGTH = 300;
 const MAX_LOOKAHEAD_DAYS = 30;
+const DIRECTION_CHOICES = [
+  { name: 'Departure', value: 'departure' },
+  { name: 'Arrival', value: 'arrival' },
+];
 
 function hasPilotRole(interaction) {
   return interaction.member.roles.cache.has(PILOT_ROLE_ID);
@@ -40,6 +44,19 @@ function normalizeIcao(value) {
 
 function normalizeCallsign(value) {
   return String(value || '').trim().toUpperCase();
+}
+
+function normalizeDirection(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'arrival' || normalized === 'departure' ? normalized : 'unspecified';
+}
+
+function formatDirectionLabel(direction) {
+  return direction === 'departure'
+    ? 'Departure'
+    : direction === 'arrival'
+      ? 'Arrival'
+      : 'Unspecified';
 }
 
 function parseRequestedTime(raw) {
@@ -108,7 +125,7 @@ function formatScheduleLine(schedule) {
     : 'none yet';
   const notesSuffix = schedule.notes ? ` | notes: ${schedule.notes}` : '';
 
-  return `**${schedule.id}** | ${schedule.callsign} | ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: <@${schedule.pilotId}> | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${notesSuffix}`;
+  return `**${schedule.id}** | ${schedule.callsign} | ${formatDirectionLabel(schedule.direction)} ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: <@${schedule.pilotId}> | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${notesSuffix}`;
 }
 
 function scheduleChannelError() {
@@ -131,6 +148,7 @@ async function handleCreate(interaction) {
   }
 
   const airport = normalizeIcao(interaction.options.getString('airport'));
+  const direction = normalizeDirection(interaction.options.getString('direction'));
   const callsign = normalizeCallsign(interaction.options.getString('callsign'));
   const notes = String(interaction.options.getString('notes') || '').trim();
   const rawTime = interaction.options.getString('time');
@@ -186,13 +204,14 @@ async function handleCreate(interaction) {
     pilotId: interaction.user.id,
     pilotName: interaction.member.displayName || interaction.user.username,
     airport,
+    direction,
     callsign,
     requestedTime: parsedTime.timestamp,
     notes,
   });
 
   await interaction.reply({
-    content: `ATC request created.\nID: **${schedule.id}**\nFlight: **${schedule.callsign}** into **${schedule.airport}**\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers: 0/${getControllerLimit()}\nATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
+    content: `ATC request created.\nID: **${schedule.id}**\nFlight: **${schedule.callsign}** | **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers: 0/${getControllerLimit()}\nATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
   });
 }
 
@@ -264,7 +283,7 @@ async function handleAssign(interaction) {
 
   if (result.error === 'already_assigned') {
     return interaction.reply({
-      content: `You are already assigned to **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
+      content: `You are already assigned to **${result.schedule.callsign}** for **${formatDirectionLabel(result.schedule.direction)} ${result.schedule.airport}**.`,
       flags: 1 << 6,
     });
   }
@@ -278,7 +297,7 @@ async function handleAssign(interaction) {
 
   const { schedule } = result;
   await interaction.reply({
-    content: `You are now assigned to **${schedule.callsign}** at **${schedule.airport}**.\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers:\n${describeControllers(schedule)}`,
+    content: `You are now assigned to **${schedule.callsign}** for **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**.\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers:\n${describeControllers(schedule)}`,
   });
 }
 
@@ -312,7 +331,7 @@ async function handleUnassign(interaction) {
   }
 
   await interaction.reply({
-    content: `You were removed from **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
+    content: `You were removed from **${result.schedule.callsign}** for **${formatDirectionLabel(result.schedule.direction)} ${result.schedule.airport}**.`,
   });
 }
 
@@ -342,7 +361,7 @@ async function handleCancel(interaction) {
   await cancelAtcSchedule(requestId);
 
   await interaction.reply({
-    content: `Cancelled request **${schedule.id}** for **${schedule.callsign}** at **${schedule.airport}**.`,
+    content: `Cancelled request **${schedule.id}** for **${schedule.callsign}** at **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**.`,
   });
 }
 
@@ -383,7 +402,7 @@ async function handleAdminAssign(interaction) {
 
   if (result.error === 'already_assigned') {
     return interaction.reply({
-      content: `<@${targetUser.id}> is already assigned to **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
+      content: `<@${targetUser.id}> is already assigned to **${result.schedule.callsign}** for **${formatDirectionLabel(result.schedule.direction)} ${result.schedule.airport}**.`,
       flags: 1 << 6,
     });
   }
@@ -396,7 +415,7 @@ async function handleAdminAssign(interaction) {
   }
 
   await interaction.reply({
-    content: `Admin override: <@${targetUser.id}> was assigned to **${result.schedule.callsign}** at **${result.schedule.airport}**.\nControllers:\n${describeControllers(result.schedule)}`,
+    content: `Admin override: <@${targetUser.id}> was assigned to **${result.schedule.callsign}** for **${formatDirectionLabel(result.schedule.direction)} ${result.schedule.airport}**.\nControllers:\n${describeControllers(result.schedule)}`,
   });
 }
 
@@ -431,7 +450,7 @@ async function handleAdminUnassign(interaction) {
   }
 
   await interaction.reply({
-    content: `Admin override: <@${targetUser.id}> was removed from **${result.schedule.callsign}** at **${result.schedule.airport}**.`,
+    content: `Admin override: <@${targetUser.id}> was removed from **${result.schedule.callsign}** for **${formatDirectionLabel(result.schedule.direction)} ${result.schedule.airport}**.`,
   });
 }
 
@@ -445,8 +464,15 @@ export const data = new SlashCommandBuilder()
       .addStringOption(option =>
         option
           .setName('airport')
-          .setDescription('Arrival or departure airport ICAO (e.g. KJFK)')
+          .setDescription('Airport ICAO (e.g. KJFK)')
           .setRequired(true)
+      )
+      .addStringOption(option =>
+        option
+          .setName('direction')
+          .setDescription('Whether this flight is arriving or departing')
+          .setRequired(true)
+          .addChoices(...DIRECTION_CHOICES)
       )
       .addStringOption(option =>
         option
