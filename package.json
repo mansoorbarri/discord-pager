@@ -6,6 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "convex:codegen": "convex codegen --typecheck disable",
+    "convex:dev": "convex dev --typecheck disable",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +15,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.21.0",
   "dependencies": {
+    "convex": "^1.34.1",
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.3",
     "eventsource": "^3.0.7",

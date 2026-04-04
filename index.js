@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { Client, GatewayIntentBits, REST, Routes, Collection, Partials } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
@@ -6,6 +6,9 @@ import http from 'http';
 import { cancelReminderFromReaction, startReminderWatcher } from './services/reminderWatcher.js';
 import { loadRoleBackups } from './roleBackup.js';
 import { loadAtcSchedules } from './services/atcScheduleStore.js';
+
+dotenv.config({ path: '.env.local', override: false });
+dotenv.config();
 
 const client = new Client({
   intents: [

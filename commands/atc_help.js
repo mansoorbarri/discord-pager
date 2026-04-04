@@ -45,7 +45,7 @@ const atcHelpSections = [
     'Purpose: remove yourself from live airport staffing.',
     '',
     '**Persistence**',
-    'ATC schedules are stored in `data/atcSchedules.json` and reloaded when the bot starts.',
+    'ATC schedules are stored in Convex and synced into the bot on startup.',
   ],
 ];
 

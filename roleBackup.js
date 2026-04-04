@@ -1,44 +1,101 @@
-import fs from 'fs/promises';
-import path from 'path';
+import { api } from './convex/_generated/api.js';
+import { getBotSecret, postConvexBotAction, subscribeBotQuery } from './services/convexBotRuntime.js';
 
-const dataDir = path.resolve('./data');
-const backupFilePath = path.join(dataDir, 'roleBackups.json');
+const initialSyncTimeoutMs = 15_000;
 
-// In-memory cache backed by disk so role restoration survives bot restarts.
 export const roleBackups = new Map();
 
-async function persistRoleBackups() {
-  await fs.mkdir(dataDir, { recursive: true });
-  const tempFilePath = `${backupFilePath}.tmp`;
-  const serialized = JSON.stringify(Object.fromEntries(roleBackups), null, 2);
-  await fs.writeFile(tempFilePath, serialized, 'utf8');
-  await fs.rename(tempFilePath, backupFilePath);
-}
+let unsubscribeFromRoleBackups = null;
+let initialSyncPromise = null;
 
-export async function loadRoleBackups() {
-  try {
-    const raw = await fs.readFile(backupFilePath, 'utf8');
-    const parsed = JSON.parse(raw);
+function refreshCache(backups) {
+  roleBackups.clear();
 
-    roleBackups.clear();
-    for (const [key, value] of Object.entries(parsed)) {
-      if (Array.isArray(value)) {
-        roleBackups.set(key, value);
-      }
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
+  for (const backup of Array.isArray(backups) ? backups : []) {
+    const backupKey = String(backup?.backupKey || '').trim();
+    const roleIds = Array.isArray(backup?.roleIds)
+      ? backup.roleIds.map(roleId => String(roleId || '').trim()).filter(Boolean)
+      : [];
+
+    if (backupKey) {
+      roleBackups.set(backupKey, roleIds);
     }
   }
 }
 
+function parseBackupKey(key) {
+  const [guildId = '', userId = ''] = String(key || '').split('-');
+  return {
+    guildId: guildId.trim(),
+    userId: userId.trim(),
+  };
+}
+
+export async function loadRoleBackups() {
+  if (initialSyncPromise) {
+    return initialSyncPromise;
+  }
+
+  if (unsubscribeFromRoleBackups) {
+    unsubscribeFromRoleBackups();
+    unsubscribeFromRoleBackups = null;
+  }
+
+  initialSyncPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('Timed out waiting for the initial Convex role backup sync.'));
+      }
+    }, initialSyncTimeoutMs);
+
+    unsubscribeFromRoleBackups = subscribeBotQuery(
+      api.roleBackups.watchBotRoleBackups,
+      { botToken: getBotSecret() },
+      backups => {
+        refreshCache(backups);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          resolve();
+        }
+      },
+      error => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          reject(error);
+          return;
+        }
+
+        console.error('[role-backups] Convex subscription error:', error);
+      }
+    );
+  });
+
+  return initialSyncPromise;
+}
+
 export async function setRoleBackup(key, roleIds) {
-  roleBackups.set(key, roleIds);
-  await persistRoleBackups();
+  const backupKey = String(key || '').trim();
+  const normalizedRoleIds = Array.isArray(roleIds)
+    ? roleIds.map(roleId => String(roleId || '').trim()).filter(Boolean)
+    : [];
+  const { guildId, userId } = parseBackupKey(backupKey);
+
+  await postConvexBotAction('/bot/role-backups/set', {
+    backupKey,
+    guildId,
+    userId,
+    roleIds: normalizedRoleIds,
+  });
+
+  roleBackups.set(backupKey, normalizedRoleIds);
 }
 
 export async function deleteRoleBackup(key) {
-  roleBackups.delete(key);
-  await persistRoleBackups();
+  const backupKey = String(key || '').trim();
+  await postConvexBotAction('/bot/role-backups/delete', { backupKey });
+  roleBackups.delete(backupKey);
 }

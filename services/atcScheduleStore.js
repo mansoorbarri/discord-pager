@@ -1,13 +1,17 @@
-import fs from 'fs/promises';
-import path from 'path';
 import crypto from 'crypto';
+import { api } from '../convex/_generated/api.js';
+import { getBotSecret, postConvexBotAction, subscribeBotQuery } from './convexBotRuntime.js';
 
-const dataDir = path.resolve('./data');
-const scheduleFilePath = path.join(dataDir, 'atcSchedules.json');
 const controllerLimit = 2;
 const expirationWindowMs = 6 * 60 * 60 * 1000;
+const pruneIntervalMs = 60 * 60 * 1000;
+const initialSyncTimeoutMs = 15_000;
 
 export const atcSchedules = new Map();
+
+let unsubscribeFromSchedules = null;
+let pruneIntervalId = null;
+let initialSyncPromise = null;
 
 function normalizeIcao(value) {
   return String(value || '').trim().toUpperCase();
@@ -47,7 +51,7 @@ function sanitizeController(controller) {
 function sanitizeSchedule(schedule) {
   if (!isObject(schedule)) return null;
 
-  const id = String(schedule.id || '').trim().toUpperCase();
+  const id = String(schedule.id ?? schedule.requestId ?? '').trim().toUpperCase();
   const guildId = String(schedule.guildId || '').trim();
   const pilotId = String(schedule.pilotId || '').trim();
   const pilotName = String(schedule.pilotName || '').trim();
@@ -57,7 +61,6 @@ function sanitizeSchedule(schedule) {
   const notes = String(schedule.notes || '').trim();
   const requestedTime = Number(schedule.requestedTime);
   const createdAt = Number(schedule.createdAt);
-  const status = schedule.status === 'cancelled' ? 'cancelled' : 'open';
   const controllers = Array.isArray(schedule.controllers)
     ? schedule.controllers.map(sanitizeController).filter(Boolean).slice(0, controllerLimit)
     : [];
@@ -86,64 +89,114 @@ function sanitizeSchedule(schedule) {
     notes,
     requestedTime,
     createdAt,
-    status,
     controllers,
   };
 }
 
-function serializeSchedules() {
-  return JSON.stringify(Array.from(atcSchedules.values()), null, 2);
-}
-
-async function persistSchedules() {
-  await fs.mkdir(dataDir, { recursive: true });
-  const tempFilePath = `${scheduleFilePath}.tmp`;
-  await fs.writeFile(tempFilePath, serializeSchedules(), 'utf8');
-  await fs.rename(tempFilePath, scheduleFilePath);
-}
-
 function isExpired(schedule, now = Date.now()) {
-  return schedule.requestedTime + expirationWindowMs < now || schedule.status === 'cancelled';
+  return schedule.requestedTime + expirationWindowMs < now;
 }
 
 function isActive(schedule, now = Date.now()) {
-  return schedule.status !== 'cancelled' && schedule.requestedTime >= now;
+  return schedule.requestedTime >= now;
 }
 
-function cleanupExpiredSchedules(now = Date.now()) {
-  let removed = false;
+function refreshCache(schedules) {
+  atcSchedules.clear();
 
-  for (const [id, schedule] of atcSchedules.entries()) {
-    if (isExpired(schedule, now)) {
-      atcSchedules.delete(id);
-      removed = true;
+  for (const schedule of schedules) {
+    const sanitized = sanitizeSchedule(schedule);
+    if (sanitized && !isExpired(sanitized)) {
+      atcSchedules.set(sanitized.id, sanitized);
     }
   }
+}
 
-  return removed;
+async function pruneExpiredSchedules() {
+  await postConvexBotAction('/bot/atc-schedules/prune', {});
+}
+
+function ensureClientClosed() {
+  if (unsubscribeFromSchedules) {
+    unsubscribeFromSchedules();
+    unsubscribeFromSchedules = null;
+  }
+
+  if (pruneIntervalId) {
+    clearInterval(pruneIntervalId);
+    pruneIntervalId = null;
+  }
+
+  initialSyncPromise = null;
 }
 
 export async function loadAtcSchedules() {
-  try {
-    const raw = await fs.readFile(scheduleFilePath, 'utf8');
-    const parsed = JSON.parse(raw);
-
-    atcSchedules.clear();
-    for (const schedule of Array.isArray(parsed) ? parsed : []) {
-      const sanitized = sanitizeSchedule(schedule);
-      if (sanitized) {
-        atcSchedules.set(sanitized.id, sanitized);
-      }
-    }
-
-    if (cleanupExpiredSchedules()) {
-      await persistSchedules();
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
+  if (initialSyncPromise) {
+    return initialSyncPromise;
   }
+
+  ensureClientClosed();
+  await pruneExpiredSchedules();
+
+  initialSyncPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('Timed out waiting for the initial Convex ATC schedule sync.'));
+      }
+    }, initialSyncTimeoutMs);
+
+    unsubscribeFromSchedules = subscribeBotQuery(
+      api.atcSchedules.watchBotSchedules,
+      { botToken: getBotSecret() },
+      schedules => {
+        refreshCache(schedules);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          resolve();
+        }
+      },
+      error => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          ensureClientClosed();
+          reject(error);
+          return;
+        }
+
+        console.error('[atc-schedule] Convex subscription error:', error);
+      }
+    );
+  });
+
+  pruneIntervalId = setInterval(() => {
+    void pruneExpiredSchedules().catch(error => {
+      console.error('[atc-schedule] periodic Convex prune failed:', error);
+    });
+  }, pruneIntervalMs);
+
+  return initialSyncPromise;
+}
+
+async function createConvexSchedule(schedule, attempt = 0) {
+  const payload = await postConvexBotAction('/bot/atc-schedules/create', schedule);
+  if (payload.duplicate) {
+    if (attempt >= 4) {
+      throw new Error('Failed to allocate a unique ATC request ID.');
+    }
+    return createConvexSchedule({ ...schedule, requestId: createId() }, attempt + 1);
+  }
+
+  const normalized = sanitizeSchedule(payload.schedule);
+  if (!normalized) {
+    throw new Error('Convex returned an invalid schedule payload.');
+  }
+
+  atcSchedules.set(normalized.id, normalized);
+  return normalized;
 }
 
 export async function createAtcSchedule({
@@ -156,9 +209,8 @@ export async function createAtcSchedule({
   requestedTime,
   notes = '',
 }) {
-  const now = Date.now();
-  const schedule = {
-    id: createId(),
+  return await createConvexSchedule({
+    requestId: createId(),
     guildId: String(guildId),
     pilotId: String(pilotId),
     pilotName: String(pilotName).trim(),
@@ -167,14 +219,7 @@ export async function createAtcSchedule({
     callsign: normalizeCallsign(callsign),
     requestedTime,
     notes: String(notes || '').trim(),
-    createdAt: now,
-    status: 'open',
-    controllers: [],
-  };
-
-  atcSchedules.set(schedule.id, schedule);
-  await persistSchedules();
-  return schedule;
+  });
 }
 
 export function listGuildSchedules(guildId, { includeMineForUserId = null, airport = null } = {}) {
@@ -207,56 +252,53 @@ export function getAtcSchedule(id) {
 }
 
 export async function cancelAtcSchedule(id) {
-  const scheduleId = String(id || '').trim().toUpperCase();
-  const schedule = atcSchedules.get(scheduleId);
-  if (!schedule) return null;
+  const payload = await postConvexBotAction('/bot/atc-schedules/cancel', {
+    requestId: String(id || '').trim().toUpperCase(),
+  });
 
-  atcSchedules.delete(scheduleId);
-  await persistSchedules();
+  const schedule = sanitizeSchedule(payload.schedule);
+  if (schedule) {
+    atcSchedules.delete(schedule.id);
+  }
   return schedule;
 }
 
 export async function assignController(scheduleId, controller) {
-  const schedule = getAtcSchedule(scheduleId);
-  if (!schedule) {
-    return { error: 'not_found' };
-  }
-
-  if (schedule.controllers.some(entry => entry.userId === controller.userId)) {
-    return { error: 'already_assigned', schedule };
-  }
-
-  if (schedule.controllers.length >= controllerLimit) {
-    return { error: 'full', schedule };
-  }
-
-  schedule.controllers.push({
-    userId: String(controller.userId),
-    username: String(controller.username).trim(),
-    assignedAt: Date.now(),
+  const payload = await postConvexBotAction('/bot/atc-schedules/assign', {
+    requestId: String(scheduleId || '').trim().toUpperCase(),
+    controller: {
+      userId: String(controller.userId),
+      username: String(controller.username).trim(),
+      assignedAt: Date.now(),
+    },
   });
 
-  await persistSchedules();
-  return { schedule };
+  const schedule = sanitizeSchedule(payload.schedule);
+  if (schedule && payload.error === null) {
+    atcSchedules.set(schedule.id, schedule);
+  }
+
+  return {
+    error: payload.error,
+    schedule,
+  };
 }
 
 export async function unassignController(scheduleId, controllerUserId) {
-  const schedule = getAtcSchedule(scheduleId);
-  if (!schedule) {
-    return { error: 'not_found' };
+  const payload = await postConvexBotAction('/bot/atc-schedules/unassign', {
+    requestId: String(scheduleId || '').trim().toUpperCase(),
+    controllerUserId: String(controllerUserId),
+  });
+
+  const schedule = sanitizeSchedule(payload.schedule);
+  if (schedule && payload.error === null) {
+    atcSchedules.set(schedule.id, schedule);
   }
 
-  const nextControllers = schedule.controllers.filter(
-    controller => controller.userId !== String(controllerUserId)
-  );
-
-  if (nextControllers.length === schedule.controllers.length) {
-    return { error: 'not_assigned', schedule };
-  }
-
-  schedule.controllers = nextControllers;
-  await persistSchedules();
-  return { schedule };
+  return {
+    error: payload.error,
+    schedule,
+  };
 }
 
 export function formatScheduleTimestamp(timestamp) {
