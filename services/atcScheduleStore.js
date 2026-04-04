@@ -302,8 +302,11 @@ export async function unassignController(scheduleId, controllerUserId) {
 }
 
 export function formatScheduleTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
   const seconds = Math.floor(timestamp / 1000);
-  return `<t:${seconds}:F> (<t:${seconds}:R>)`;
+  return `${hours}:${minutes}Z (<t:${seconds}:R>)`;
 }
 
 export function getControllerLimit() {

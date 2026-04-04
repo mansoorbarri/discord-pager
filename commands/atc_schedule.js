@@ -20,7 +20,6 @@ import {
 const ICAO_REGEX = /^[A-Z]{4}$/;
 const CALLSIGN_REGEX = /^[A-Z0-9-]{2,12}$/;
 const MAX_NOTES_LENGTH = 300;
-const MAX_LOOKAHEAD_DAYS = 30;
 const DIRECTION_CHOICES = [
   { name: 'Departure', value: 'departure' },
   { name: 'Arrival', value: 'arrival' },
@@ -62,48 +61,35 @@ function formatDirectionLabel(direction) {
 function parseRequestedTime(raw) {
   const input = String(raw || '').trim();
   if (!input) {
-    return { error: 'Provide a time in `YYYY-MM-DD HH:MM` format, or a Discord timestamp like `<t:1767225600:F>`.' };
+    return { error: 'Provide a Zulu time in `HH:MM` format, for example `19:30`.' };
   }
 
-  const discordMatch = input.match(/^<t:(\d{9,}):[a-zA-Z]>$/);
-  if (discordMatch) {
-    const timestamp = Number(discordMatch[1]) * 1000;
-    return Number.isFinite(timestamp) ? { timestamp } : { error: 'Invalid Discord timestamp.' };
-  }
-
-  const unixMatch = input.match(/^\d{10}$/);
-  if (unixMatch) {
-    return { timestamp: Number(input) * 1000 };
-  }
-
-  const normalized = input.replace('T', ' ');
-  const match = normalized.match(
-    /^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?$/
-  );
+  const match = input.match(/^(\d{2}):(\d{2})$/);
 
   if (!match) {
-    return { error: 'Use `YYYY-MM-DD HH:MM` in UTC, for example `2026-04-02 19:30`.' };
+    return { error: 'Use `HH:MM` in Zulu time, for example `19:30`.' };
   }
 
-  const [, yearText, monthText, dayText, hourText = '00', minuteText = '00'] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
+  const [, hourText, minuteText] = match;
   const hour = Number(hourText);
   const minute = Number(minuteText);
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const day = now.getUTCDate();
 
-  const timestamp = Date.UTC(year, month - 1, day, hour, minute);
+  const timestamp = Date.UTC(year, month, day, hour, minute);
   const date = new Date(timestamp);
 
   if (
     !Number.isFinite(timestamp) ||
     date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
+    date.getUTCMonth() !== month ||
     date.getUTCDate() !== day ||
     date.getUTCHours() !== hour ||
     date.getUTCMinutes() !== minute
   ) {
-    return { error: 'That date/time is not valid.' };
+    return { error: 'That Zulu time is not valid.' };
   }
 
   return { timestamp };
@@ -183,18 +169,10 @@ async function handleCreate(interaction) {
   }
 
   const now = Date.now();
-  const latestAllowed = now + MAX_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000;
 
   if (parsedTime.timestamp < now) {
     return interaction.reply({
-      content: 'The requested time must be in the future.',
-      flags: 1 << 6,
-    });
-  }
-
-  if (parsedTime.timestamp > latestAllowed) {
-    return interaction.reply({
-      content: `Requests can only be scheduled up to ${MAX_LOOKAHEAD_DAYS} days ahead.`,
+      content: 'The requested Zulu time must still be ahead today.',
       flags: 1 << 6,
     });
   }
@@ -486,7 +464,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption(option =>
         option
           .setName('time')
-          .setDescription('UTC time as YYYY-MM-DD HH:MM, or a Discord timestamp')
+          .setDescription('Zulu time today as HH:MM')
           .setRequired(true)
       )
       .addStringOption(option =>
