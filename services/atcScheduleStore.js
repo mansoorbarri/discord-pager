@@ -99,6 +99,10 @@ function isExpired(schedule, now = Date.now()) {
   return schedule.requestedTime + expirationWindowMs < now || schedule.status === 'cancelled';
 }
 
+function isActive(schedule, now = Date.now()) {
+  return schedule.status !== 'cancelled' && schedule.requestedTime >= now;
+}
+
 function cleanupExpiredSchedules(now = Date.now()) {
   let removed = false;
 
@@ -170,7 +174,7 @@ export function listGuildSchedules(guildId, { includeMineForUserId = null, airpo
 
   return Array.from(atcSchedules.values())
     .filter(schedule => schedule.guildId === String(guildId))
-    .filter(schedule => !isExpired(schedule, now))
+    .filter(schedule => isActive(schedule, now))
     .filter(schedule => !requestedAirport || schedule.airport === requestedAirport)
     .filter(schedule => !includeMineForUserId || schedule.pilotId === String(includeMineForUserId))
     .sort((a, b) => {
@@ -186,7 +190,7 @@ export function listGuildSchedules(guildId, { includeMineForUserId = null, airpo
 
 export function getAtcSchedule(id) {
   const schedule = atcSchedules.get(String(id || '').trim().toUpperCase());
-  if (!schedule || isExpired(schedule)) {
+  if (!schedule || !isActive(schedule)) {
     return null;
   }
 
