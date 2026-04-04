@@ -125,7 +125,7 @@ function formatScheduleLine(schedule) {
     : 'none yet';
   const notesSuffix = schedule.notes ? ` | notes: ${schedule.notes}` : '';
 
-  return `**${schedule.id}** | ${schedule.callsign} | ${formatDirectionLabel(schedule.direction)} ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: <@${schedule.pilotId}> | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${notesSuffix}`;
+  return `**${schedule.id}** | ${schedule.callsign} | ${formatDirectionLabel(schedule.direction)} ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: ${schedule.pilotName} | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${notesSuffix}`;
 }
 
 function scheduleChannelError() {
