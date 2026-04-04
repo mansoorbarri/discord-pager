@@ -211,7 +211,10 @@ async function handleCreate(interaction) {
   });
 
   await interaction.reply({
-    content: `ATC request created.\nID: **${schedule.id}**\nFlight: **${schedule.callsign}** | **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers: 0/${getControllerLimit()}\nATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
+    content: `<@&${ATC_ROLE_ID}> new ATC request created.\nID: **${schedule.id}**\nFlight: **${schedule.callsign}** | **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers: 0/${getControllerLimit()}\nATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
+    allowedMentions: {
+      roles: [ATC_ROLE_ID],
+    },
   });
 }
 

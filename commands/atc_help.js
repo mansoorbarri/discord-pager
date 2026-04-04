@@ -12,7 +12,7 @@ const atcHelpSections = [
     '`/atc_schedule create airport:<ICAO> direction:<arrival|departure> callsign:<CALLSIGN> time:<YYYY-MM-DD HH:MM UTC> [notes]`',
     `Use: pilots only (<@&${PILOT_ROLE_ID}>)`,
     `Channel: <#${SCHEDULE_CHANNEL_ID}> only`,
-    'Purpose: create a scheduled ATC request so controllers can claim it ahead of time.',
+    'Purpose: create a scheduled ATC request, ping the ATC role, and let controllers claim it ahead of time.',
     '',
     '`/atc_schedule list [airport] [mine]`',
     `Use: pilots or ATC (<@&${PILOT_ROLE_ID}> or <@&${ATC_ROLE_ID}>)`,
