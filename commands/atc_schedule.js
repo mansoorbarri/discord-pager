@@ -121,7 +121,7 @@ function describeControllers(schedule) {
 
 function formatScheduleLine(schedule) {
   const controllerSummary = schedule.controllers.length
-    ? schedule.controllers.map(controller => `<@${controller.userId}>`).join(', ')
+    ? schedule.controllers.map(controller => controller.username).join(', ')
     : 'none yet';
   const notesSuffix = schedule.notes ? ` | notes: ${schedule.notes}` : '';
 
