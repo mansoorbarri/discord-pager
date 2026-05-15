@@ -20,6 +20,7 @@ import {
 const ICAO_REGEX = /^[A-Z]{4}$/;
 const CALLSIGN_REGEX = /^[A-Z0-9-]{2,12}$/;
 const MAX_NOTES_LENGTH = 300;
+const MAX_ROUTE_LENGTH = 300;
 const DIRECTION_CHOICES = [
   { name: 'Departure', value: 'departure' },
   { name: 'Arrival', value: 'arrival' },
@@ -105,13 +106,18 @@ function describeControllers(schedule) {
     .join('\n');
 }
 
+function formatInlineCode(value) {
+  return `\`${String(value || '').replace(/`/g, '')}\``;
+}
+
 function formatScheduleLine(schedule) {
   const controllerSummary = schedule.controllers.length
     ? schedule.controllers.map(controller => controller.username).join(', ')
     : 'none yet';
+  const routeSuffix = schedule.route ? ` | route: ${formatInlineCode(schedule.route)}` : '';
   const notesSuffix = schedule.notes ? ` | notes: ${schedule.notes}` : '';
 
-  return `**${schedule.id}** | ${schedule.callsign} | ${formatDirectionLabel(schedule.direction)} ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: ${schedule.pilotName} | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${notesSuffix}`;
+  return `**${schedule.id}** | ${schedule.callsign} | ${formatDirectionLabel(schedule.direction)} ${schedule.airport} | ${formatScheduleTimestamp(schedule.requestedTime)} | pilot: ${schedule.pilotName} | controllers (${schedule.controllers.length}/${getControllerLimit()}): ${controllerSummary}${routeSuffix}${notesSuffix}`;
 }
 
 function scheduleChannelError() {
@@ -136,6 +142,7 @@ async function handleCreate(interaction) {
   const airport = normalizeIcao(interaction.options.getString('airport'));
   const direction = normalizeDirection(interaction.options.getString('direction'));
   const callsign = normalizeCallsign(interaction.options.getString('callsign'));
+  const route = String(interaction.options.getString('route') || '').trim();
   const notes = String(interaction.options.getString('notes') || '').trim();
   const rawTime = interaction.options.getString('time');
 
@@ -156,6 +163,13 @@ async function handleCreate(interaction) {
   if (notes.length > MAX_NOTES_LENGTH) {
     return interaction.reply({
       content: `Notes are too long. Keep them under ${MAX_NOTES_LENGTH} characters.`,
+      flags: 1 << 6,
+    });
+  }
+
+  if (route.length > MAX_ROUTE_LENGTH) {
+    return interaction.reply({
+      content: `Route is too long. Keep it under ${MAX_ROUTE_LENGTH} characters.`,
       flags: 1 << 6,
     });
   }
@@ -185,11 +199,22 @@ async function handleCreate(interaction) {
     direction,
     callsign,
     requestedTime: parsedTime.timestamp,
+    route,
     notes,
   });
 
   await interaction.reply({
-    content: `<@&${ATC_ROLE_ID}> new ATC request created.\nID: **${schedule.id}**\nFlight: **${schedule.callsign}** | **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers: 0/${getControllerLimit()}\nATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
+    content: [
+      `<@&${ATC_ROLE_ID}> new ATC request created.`,
+      `ID: **${schedule.id}**`,
+      `Flight: **${schedule.callsign}** | **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**`,
+      `Time: ${formatScheduleTimestamp(schedule.requestedTime)}`,
+      schedule.route ? `Route: ${formatInlineCode(schedule.route)}` : null,
+      `Controllers: 0/${getControllerLimit()}`,
+      `ATC members can now claim this with \`/atc_schedule assign request_id:${schedule.id}\`.`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
     allowedMentions: {
       roles: [ATC_ROLE_ID],
     },
@@ -278,7 +303,14 @@ async function handleAssign(interaction) {
 
   const { schedule } = result;
   await interaction.reply({
-    content: `You are now assigned to **${schedule.callsign}** for **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**.\nTime: ${formatScheduleTimestamp(schedule.requestedTime)}\nControllers:\n${describeControllers(schedule)}`,
+    content: [
+      `You are now assigned to **${schedule.callsign}** for **${formatDirectionLabel(schedule.direction)} ${schedule.airport}**.`,
+      `Time: ${formatScheduleTimestamp(schedule.requestedTime)}`,
+      schedule.route ? `Route: ${formatInlineCode(schedule.route)}` : null,
+      `Controllers:\n${describeControllers(schedule)}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
   });
 }
 
@@ -469,8 +501,14 @@ export const data = new SlashCommandBuilder()
       )
       .addStringOption(option =>
         option
+          .setName('route')
+          .setDescription('Optional route string shown in inline code')
+          .setRequired(false)
+      )
+      .addStringOption(option =>
+        option
           .setName('notes')
-          .setDescription('Optional route, runway, or event notes')
+          .setDescription('Optional runway or event notes')
           .setRequired(false)
       )
   )

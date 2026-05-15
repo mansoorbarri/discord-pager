@@ -17,6 +17,7 @@ export default defineSchema({
     direction: v.union(v.literal('arrival'), v.literal('departure')),
     callsign: v.string(),
     requestedTime: v.number(),
+    route: v.optional(v.string()),
     notes: v.string(),
     createdAt: v.number(),
     controllers: v.array(controllerValidator),

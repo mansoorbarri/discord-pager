@@ -58,6 +58,7 @@ function sanitizeSchedule(schedule) {
   const airport = normalizeIcao(schedule.airport);
   const direction = normalizeDirection(schedule.direction);
   const callsign = normalizeCallsign(schedule.callsign);
+  const route = String(schedule.route || '').trim();
   const notes = String(schedule.notes || '').trim();
   const requestedTime = Number(schedule.requestedTime);
   const createdAt = Number(schedule.createdAt);
@@ -86,6 +87,7 @@ function sanitizeSchedule(schedule) {
     airport,
     direction,
     callsign,
+    route,
     notes,
     requestedTime,
     createdAt,
@@ -207,6 +209,7 @@ export async function createAtcSchedule({
   direction,
   callsign,
   requestedTime,
+  route = '',
   notes = '',
 }) {
   return await createConvexSchedule({
@@ -218,6 +221,7 @@ export async function createAtcSchedule({
     direction: normalizeDirection(direction),
     callsign: normalizeCallsign(callsign),
     requestedTime,
+    route: String(route || '').trim(),
     notes: String(notes || '').trim(),
   });
 }

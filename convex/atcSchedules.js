@@ -4,6 +4,7 @@ import { query, internalQuery, internalMutation } from './_generated/server.js';
 const ICAO_REGEX = /^[A-Z]{4}$/;
 const CALLSIGN_REGEX = /^[A-Z0-9-]{2,12}$/;
 const MAX_NOTES_LENGTH = 300;
+const MAX_ROUTE_LENGTH = 300;
 const MAX_LOOKAHEAD_DAYS = 30;
 const CONTROLLER_LIMIT = 2;
 const EXPIRATION_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -25,6 +26,7 @@ const scheduleValidator = v.object({
   direction: v.union(v.literal('arrival'), v.literal('departure')),
   callsign: v.string(),
   requestedTime: v.number(),
+  route: v.optional(v.string()),
   notes: v.string(),
   createdAt: v.number(),
   controllers: v.array(controllerValidator),
@@ -58,6 +60,14 @@ function normalizeNotes(value) {
   const normalized = String(value || '').trim();
   if (normalized.length > MAX_NOTES_LENGTH) {
     throw new Error(`Notes must be ${MAX_NOTES_LENGTH} characters or fewer.`);
+  }
+  return normalized;
+}
+
+function normalizeRoute(value) {
+  const normalized = String(value || '').trim();
+  if (normalized.length > MAX_ROUTE_LENGTH) {
+    throw new Error(`Route must be ${MAX_ROUTE_LENGTH} characters or fewer.`);
   }
   return normalized;
 }
@@ -110,6 +120,7 @@ function toScheduleResponse(doc) {
     direction: doc.direction,
     callsign: doc.callsign,
     requestedTime: doc.requestedTime,
+    route: doc.route || '',
     notes: doc.notes,
     createdAt: doc.createdAt,
     controllers: doc.controllers,
@@ -153,6 +164,7 @@ export const create = internalMutation({
     direction: v.string(),
     callsign: v.string(),
     requestedTime: v.number(),
+    route: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
   returns: v.object({
@@ -167,6 +179,7 @@ export const create = internalMutation({
         direction: v.union(v.literal('arrival'), v.literal('departure')),
         callsign: v.string(),
         requestedTime: v.number(),
+        route: v.string(),
         notes: v.string(),
         createdAt: v.number(),
         controllers: v.array(controllerValidator),
@@ -180,6 +193,7 @@ export const create = internalMutation({
     const direction = normalizeDirection(args.direction);
     const callsign = normalizeCallsign(args.callsign);
     const pilotName = normalizeName(args.pilotName, 'pilotName');
+    const route = normalizeRoute(args.route || '');
     const notes = normalizeNotes(args.notes || '');
 
     assertValidCreateArgs({
@@ -203,6 +217,7 @@ export const create = internalMutation({
       direction,
       callsign,
       requestedTime: args.requestedTime,
+      route,
       notes,
       createdAt,
       controllers: [],
@@ -230,6 +245,7 @@ export const cancel = internalMutation({
       direction: v.union(v.literal('arrival'), v.literal('departure')),
       callsign: v.string(),
       requestedTime: v.number(),
+      route: v.string(),
       notes: v.string(),
       createdAt: v.number(),
       controllers: v.array(controllerValidator),
@@ -264,6 +280,7 @@ export const assignController = internalMutation({
         direction: v.union(v.literal('arrival'), v.literal('departure')),
         callsign: v.string(),
         requestedTime: v.number(),
+        route: v.string(),
         notes: v.string(),
         createdAt: v.number(),
         controllers: v.array(controllerValidator),
@@ -316,6 +333,7 @@ export const unassignController = internalMutation({
         direction: v.union(v.literal('arrival'), v.literal('departure')),
         callsign: v.string(),
         requestedTime: v.number(),
+        route: v.string(),
         notes: v.string(),
         createdAt: v.number(),
         controllers: v.array(controllerValidator),
