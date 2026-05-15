@@ -66,6 +66,9 @@ function normalizeNotes(value) {
 
 function normalizeRoute(value) {
   const normalized = String(value || '').trim();
+  if (!normalized) {
+    throw new Error('Route is required.');
+  }
   if (normalized.length > MAX_ROUTE_LENGTH) {
     throw new Error(`Route must be ${MAX_ROUTE_LENGTH} characters or fewer.`);
   }
@@ -164,7 +167,7 @@ export const create = internalMutation({
     direction: v.string(),
     callsign: v.string(),
     requestedTime: v.number(),
-    route: v.optional(v.string()),
+    route: v.string(),
     notes: v.optional(v.string()),
   },
   returns: v.object({

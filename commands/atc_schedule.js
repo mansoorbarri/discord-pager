@@ -160,6 +160,13 @@ async function handleCreate(interaction) {
     });
   }
 
+  if (!route) {
+    return interaction.reply({
+      content: 'Route is required.',
+      flags: 1 << 6,
+    });
+  }
+
   if (notes.length > MAX_NOTES_LENGTH) {
     return interaction.reply({
       content: `Notes are too long. Keep them under ${MAX_NOTES_LENGTH} characters.`,
@@ -502,8 +509,8 @@ export const data = new SlashCommandBuilder()
       .addStringOption(option =>
         option
           .setName('route')
-          .setDescription('Optional route string shown in inline code')
-          .setRequired(false)
+          .setDescription('Route string shown in inline code')
+          .setRequired(true)
       )
       .addStringOption(option =>
         option
