@@ -9,7 +9,7 @@ const atcHelpSections = [
   [
     '**Pager Bot Commands: ATC**',
     '',
-    '`/atc_schedule create airport:<ICAO> direction:<arrival|departure> callsign:<CALLSIGN> time:<HH:MM Z> [notes]`',
+    '`/atc_schedule create airport:<ICAO> direction:<arrival|departure> callsign:<CALLSIGN> time:<HHMM Z> [notes]`',
     `Use: pilots only (<@&${PILOT_ROLE_ID}>)`,
     `Channel: <#${SCHEDULE_CHANNEL_ID}> only`,
     'Purpose: create a same-day ATC request in Zulu time, ping the ATC role, and let controllers claim it ahead of time.',

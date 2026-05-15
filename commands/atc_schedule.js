@@ -61,13 +61,13 @@ function formatDirectionLabel(direction) {
 function parseRequestedTime(raw) {
   const input = String(raw || '').trim();
   if (!input) {
-    return { error: 'Provide a Zulu time in `HH:MM` format, for example `19:30`.' };
+    return { error: 'Provide a Zulu time in `HHMM` format, for example `1930`.' };
   }
 
-  const match = input.match(/^(\d{2}):(\d{2})$/);
+  const match = input.match(/^(\d{2})(\d{2})$/);
 
   if (!match) {
-    return { error: 'Use `HH:MM` in Zulu time, for example `19:30`.' };
+    return { error: 'Use `HHMM` in Zulu time, for example `1930`.' };
   }
 
   const [, hourText, minuteText] = match;
@@ -464,7 +464,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption(option =>
         option
           .setName('time')
-          .setDescription('Zulu time today as HH:MM')
+          .setDescription('Zulu time today as HHMM')
           .setRequired(true)
       )
       .addStringOption(option =>
